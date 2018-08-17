@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>MathJax TeX Test Page</title>
+<script>
+function init(obj){
+    var encrypt = encryptInit();
+    var file = obj.files[0];
+    encrypt.sha(file, function (res) {
+        console.log(res)
+        document.getElementById("result").value=JSON.stringify(res)
+    }, function (error) {
+       
+    });
+    encrypt.onProcess(function (processed) {
+       
+    });
+}
+
+var encryptInit = function encryptInit() {
+
+    var KB1 = Math.pow(2, 10);
+    var MB1 = Math.pow(2, 20);
+    var fragment = KB1 * 512;
+    var checkFragment = 128;
+    var SHA = SHAInit();
+    var pausing = false;
+    var onProcessCallback = void 0;
+    var lastProcessCallbackTime = 0;
+    var shaObj = void 0;
+    var hashList = void 0;
+
+    var sliceStart = 0;
+    var sliceEnd = 0;
+
+    function readerFile(file, start, end, succCallback, failCallback) {
+        var h5FileReader = new FileReader();
+
+        h5FileReader.onload = function (e) {
+            succCallback(e.target.result);
+        };
+
+        h5FileReader.onerror = function (e) {
+            failCallback(e);
+        };
+
+        h5FileReader.readAsArrayBuffer(blobFile(file, start, end));
+    }
+
+    function blobFile(file, start, end) {
+        if (file.webkitSlice) {
+            return file.webkitSlice(start, end);
+        } else if (file.mozSlice) {
+            return file.mozSlice(start, end);
+        } else {
+            return file.slice(start, end);
+        }
+    }
+
+    function encryptSHA(file, succCallback, failCallback) {
+        var fileSize = file.size;
+        var sha = shaObj || new SHA(checkFragment);
+        var tempHashList = hashList || [];
+        var checkSha = void 0;
+        var checkData = void 0;
+        var checking = false;
+        var checkLen = 0;
+        var checkDataStart = 0;
+        var checkDataEnd = 0;
+
+        if (fileSize === 0) {
+            failCallback({
+                'ret': 2002023,
+                'msg': 'fileSize equal 0，have moved or deleted'
+            });
+            return;
+        }
+
+        var handler = {
+            onFileReaderHandler: function onFileReaderHandler(buffer) {
+                sha.append(buffer);
+                handler.onUpdateHandler();
+            },
+            onFileErrorHandler: function onFileErrorHandler(e) {
+                shaObj = null;
+                tempHashList = null;
+                sliceStart = 0;
+                sliceEnd = 0;
+                debugger;
+                failCallback({
+                    'ret': 2002001,
+                    'msg': '[encrypt]: ' + (e.target.error && (e.target.error.stack || e.target.error.message) + '' || e + '' || 'onFileErrorHandler') + ', name: ' + file.name + ', start: ' + sliceStart + ', end: ' + sliceEnd
+                });
+            },
+
+            onUpdateHandler: function onUpdateHandler() {
+                var hash = void 0;
+                console.log(sha)
+                if (sliceEnd < fileSize) {
+                    if (pausing === true) {
+                        tempHashList.push({
+                            'sha': sha.getTempHash(),
+                            'offset': sliceStart,
+                            'size': sliceEnd - sliceStart
+                        });
+                        shaObj = sha;
+                        hashList = tempHashList;
+                        return;
+                    }
+
+                    if (checking) {
+                        checkSha = sha.getTempHash();
+                    } else {
+                        tempHashList.push({
+                            'sha': sha.getTempHash(),
+                            'offset': sliceStart,
+                            'size': sliceEnd - sliceStart
+                        });
+
+                        if (lastProcessCallbackTime === 0 || +new Date() - lastProcessCallbackTime > 1000) {
+                            onProcessCallback(sliceEnd);
+                            lastProcessCallbackTime = +new Date();
+                        }
+                    }
+
+                    chunk();
+                } else {
+                    hash = sha.end();
+                    tempHashList.push({
+                        'sha': hash,
+                        'offset': sliceStart - checkLen,
+                        'size': sliceEnd - sliceStart + checkLen
+                    });
+
+                    var h5FileReader = new FileReader();
+                    h5FileReader.onload = function (e) {
+                        checkData = h5FileReader.result.slice(h5FileReader.result.indexOf("base64,") + 7);
+                        if (fileSize < checkFragment) {
+                            checkSha = hash;
+                        }
+                        succCallback({
+                            block_info_list: tempHashList,
+                            check_sha: checkSha,
+                            check_data: checkData
+                        });
+                    };
+                    h5FileReader.onerror = function (e) {
+                        failCallback({
+                            ret: 2002024,
+                            msg: 'read check_data fail'
+                        });
+                    };
+
+                    h5FileReader.readAsDataURL(blobFile(file, checkDataStart, checkDataEnd));
+                }
+            }
+        };
+
+        function chunk() {
+            sliceStart = sliceEnd;
+            sliceEnd = Math.min(sliceStart + fragment, fileSize);
+            if (sliceEnd === fileSize && !checking) {
+                if (sliceEnd - sliceStart > checkFragment) {
+                    checking = true;
+
+                    sliceEnd = sliceEnd - (sliceEnd % checkFragment === 0 ? checkFragment : sliceEnd % checkFragment);
+                    checkLen = sliceEnd - sliceStart;
+
+                    checkDataStart = sliceEnd;
+                    checkDataEnd = fileSize;
+                } else {
+                    checkSha = tempHashList.length && tempHashList[tempHashList.length - 1]['sha'];
+                    checkDataStart = sliceStart;
+                    checkDataEnd = sliceEnd;
+                }
+            }
+            readerFile(file, sliceStart, sliceEnd, handler.onFileReaderHandler, handler.onFileErrorHandler);
+        }
+
+        pausing = false;
+        chunk();
+    }
+
+    function pause() {
+        pausing = true;
+    }
+
+    function onProcess(fn) {
+        onProcessCallback = fn;
+    }
+
+    return {
+        sha: encryptSHA,
+        pause: pause,
+        onProcess: onProcess
+    };
+};
+
+var SHAInit = function SHAInit() {
+        var padlen = function padlen(len) {
+            for (len += 9; len % 64 > 0; len += 1) {}
+            return len;
+        };
+        var padZeroes = function padZeroes(bin, len) {
+            var h8 = new Uint8Array(bin.buffer);
+            var om = len % 4;
+            var align = len - om;
+            switch (om) {
+                case 0:
+                    h8[align + 3] = 0;
+                case 1:
+                    h8[align + 2] = 0;
+                case 2:
+                    h8[align + 1] = 0;
+                case 3:
+                    h8[align + 0] = 0;
+            }
+            for (var i = (len >> 2) + 1; i < bin.length; i++) {
+                bin[i] = 0;
+            }
+        };
+        var padData = function padData(bin, chunkLen, msgLen) {
+            bin[chunkLen >> 2] |= 0x80 << 24 - (chunkLen % 4 << 3);
+
+            bin[((chunkLen >> 2) + 2 & ~0x0f) + 14] = msgLen / (1 << 29) | 0;
+            bin[((chunkLen >> 2) + 2 & ~0x0f) + 15] = msgLen << 3;
+        };
+        var hex = function hex(arrayBuffer) {
+            var i,
+                x,
+                hex_tab = '0123456789abcdef',
+                res = '',
+                binarray = new Uint8Array(arrayBuffer);
+            for (i = 0; i < binarray.length; i++) {
+                x = binarray[i];
+                res += hex_tab.charAt(x >> 4 & 15) + hex_tab.charAt(x >> 0 & 15);
+            }
+            return res;
+        };
+        var ceilHeapSize = function ceilHeapSize(v) {
+            var p;
+            if (v <= 65536) return 65536;
+            if (v < 16777216) {
+                for (p = 65536; p < v; p = p << 1) {}
+            } else {
+                for (p = 16777216; p < v; p += 16777216) {}
+            }
+            return p;
+        };
+        var getRawDigest = function getRawDigest(heap, padMaxChunkLen) {
+            var io = new Int32Array(heap, padMaxChunkLen + 320, 5);
+            var out = new Int32Array(5);
+            var arr = new DataView(out.buffer);
+            arr.setInt32(0, io[0], false);
+            arr.setInt32(4, io[1], false);
+            arr.setInt32(8, io[2], false);
+            arr.setInt32(12, io[3], false);
+            arr.setInt32(16, io[4], false);
+            return out;
+        };
+        function Rusha(chunkSize) {
+            'use strict';
+
+            var self$2 = {};
+            chunkSize = chunkSize || 64 * 1024;
+            if (chunkSize % 64 > 0) {
+                throw new Error('Chunk size must be a multiple of 128 bit');
+            }
+            self$2.offset = 0;
+            self$2.maxChunkLen = chunkSize;
+            self$2.padMaxChunkLen = padlen(chunkSize);
+
+            self$2.heap = new ArrayBuffer(ceilHeapSize(self$2.padMaxChunkLen + 320 + 20));
+            self$2.h32 = new Int32Array(self$2.heap);
+            self$2.h8 = new Int8Array(self$2.heap);
+            self$2.core = new Rusha._core({ Int32Array: Int32Array }, {}, self$2.heap);
+
+            self$2.tempHash = [];
+            initState();
+            function initState() {
+                self$2.offset = 0;
+                var io = new Int32Array(self$2.heap, self$2.padMaxChunkLen + 320, 5);
+                io[0] = 1732584193;
+                io[1] = -271733879;
+                io[2] = -1732584194;
+                io[3] = 271733878;
+                io[4] = -1009589776;
+            }
+            function convBuf(buf, start, len, offset) {
+                var om = offset % 4;
+                var lm = (len + om) % 4;
+                var j = len - lm;
+                switch (om) {
+                    case 0:
+                        self$2.h8[offset] = buf[start + 3];
+                    case 1:
+                        self$2.h8[offset + 1 - (om << 1) | 0] = buf[start + 2];
+                    case 2:
+                        self$2.h8[offset + 2 - (om << 1) | 0] = buf[start + 1];
+                    case 3:
+                        self$2.h8[offset + 3 - (om << 1) | 0] = buf[start];
+                }
+                if (len < lm + om) {
+                    return;
+                }
+                for (var i = 4 - om; i < j; i = i + 4 | 0) {
+                    self$2.h32[offset + i >> 2 | 0] = buf[start + i] << 24 | buf[start + i + 1] << 16 | buf[start + i + 2] << 8 | buf[start + i + 3];
+                }
+                switch (lm) {
+                    case 3:
+                        self$2.h8[offset + j + 1 | 0] = buf[start + j + 2];
+                    case 2:
+                        self$2.h8[offset + j + 2 | 0] = buf[start + j + 1];
+                    case 1:
+                        self$2.h8[offset + j + 3 | 0] = buf[start + j];
+                }
+            }
+            ;
+            var rawDigest = this.rawDigest = function (msg) {
+                var msgLen = msg.byteLength;
+                initState();
+                msg = new Uint8Array(msg);
+                var chunkLen = self$2.maxChunkLen;
+                var chunkOffset = 0;
+                for (; chunkOffset + chunkLen < msgLen; chunkOffset += chunkLen) {
+                    convBuf(msg, chunkOffset, chunkLen, 0);
+                    self$2.core.hash(chunkLen, self$2.padMaxChunkLen);
+                }
+                chunkLen = msgLen - chunkOffset;
+                var padChunkLen = padlen(chunkLen);
+                var view = new Int32Array(self$2.heap, 0, padChunkLen >> 2);
+                convBuf(msg, chunkOffset, chunkLen, 0);
+                padZeroes(view, chunkLen);
+                padData(view, chunkLen, msgLen);
+                self$2.core.hash(padChunkLen, self$2.padMaxChunkLen);
+                return getRawDigest(self$2.heap, self$2.padMaxChunkLen);
+            };
+
+            this.digest = function (msg) {
+                return hex(rawDigest(msg).buffer);
+            };
+            var reset = this.reset = function () {
+                initState();
+            };
+            this.append = function (chunk) {
+                var chunkOffset = 0;
+                var chunkLen = chunk.byteLength;
+                var turnOffset = self$2.offset % self$2.maxChunkLen;
+                chunk = new Uint8Array(chunk);
+                self$2.offset += chunkLen;
+                while (chunkOffset < chunkLen) {
+                    var inputLen = Math.min(chunkLen - chunkOffset, self$2.maxChunkLen - turnOffset);
+                    convBuf(chunk, chunkOffset, inputLen, turnOffset);
+                    turnOffset += inputLen;
+                    chunkOffset += inputLen;
+                    if (turnOffset === self$2.maxChunkLen) {
+                        self$2.core.hash(self$2.maxChunkLen, self$2.padMaxChunkLen);
+                        turnOffset = 0;
+                    }
+                }
+            };
+
+            this.getTempHash = function () {
+                var state = this.getState();
+                var binarray = state.io;
+                var hex_tab = "0123456789abcdef",
+                    str = "",
+                    temp = "",
+                    length = binarray.length,
+                    i,
+                    j,
+                    k,
+                    srcByte;
+
+                for (i = 0; i < length; i += 1) {
+                    for (j = 0; j < 4; j += 1) {
+                        k = i * 4 + j;
+
+                        srcByte = binarray[k >>> 2] >>> (3 - k % 4) * 8;
+                        temp += hex_tab.charAt(srcByte >>> 4 & 0xF) + hex_tab.charAt(srcByte & 0xF);
+                    }
+                    str += temp.match(/(\w\w)(\w\w)(\w\w)(\w\w)/).slice(1).reverse().join('');
+                    temp = "";
+                }
+
+                this.setState(state);
+
+                return str;
+            };
+
+            this.arraybuffer2binb = function (arr, existingBin, existingBinLen) {
+                var bin = [],
+                    i,
+                    existingByteLen,
+                    intOffset,
+                    byteOffset;
+
+                bin = existingBin || [0];
+                existingBinLen = existingBinLen || 0;
+                existingByteLen = existingBinLen >>> 3;
+
+                for (i = 0; i < arr.byteLength; i += 1) {
+                    byteOffset = i + existingByteLen;
+                    intOffset = byteOffset >>> 2;
+                    if (bin.length <= intOffset) {
+                        bin.push(0);
+                    }
+                    bin[intOffset] |= arr[i] << 8 * (3 - byteOffset % 4);
+                }
+
+                return bin;
+            };
+
+            var rawEnd = this.rawEnd = function () {
+                var msgLen = self$2.offset;
+                var chunkLen = msgLen % self$2.maxChunkLen;
+                var padChunkLen = padlen(chunkLen);
+                var view = new Int32Array(self$2.heap, 0, padChunkLen >> 2);
+                padZeroes(view, chunkLen);
+                padData(view, chunkLen, msgLen);
+                self$2.core.hash(padChunkLen, self$2.padMaxChunkLen);
+                var result = getRawDigest(self$2.heap, self$2.padMaxChunkLen);
+                initState();
+                return result;
+            };
+            this.end = function () {
+                return hex(rawEnd().buffer);
+            };
+            this.getState = function () {
+
+                var turnOffset = self$2.offset % self$2.maxChunkLen,
+                    heap;
+
+                if (!turnOffset) {
+                    var io = new Int32Array(self$2.heap, self$2.padMaxChunkLen + 320, 5);
+                    heap = io.buffer.slice(io.byteOffset, io.byteOffset + io.byteLength);
+                } else {
+                    heap = self$2.heap.slice(0);
+                }
+
+                return {
+                    offset: self$2.offset,
+                    heap: heap,
+                    io: io
+                };
+            };
+            this.setState = function (state) {
+                self$2.offset = state.offset;
+                if (state.heap.byteLength === 20) {
+                    var io = new Int32Array(self$2.heap, self$2.padMaxChunkLen + 320, 5);
+                    io.set(new Int32Array(state.heap));
+                } else {
+                    self$2.h32.set(new Int32Array(state.heap));
+                }
+            };
+        }
+        ;
+
+        Rusha._core = function RushaCore(stdlib, foreign, heap) {
+            var H = new stdlib.Int32Array(heap);
+            function hash(k, x) {
+                k = k | 0;
+                x = x | 0;
+                var i = 0,
+                    j = 0,
+                    y0 = 0,
+                    z0 = 0,
+                    y1 = 0,
+                    z1 = 0,
+                    y2 = 0,
+                    z2 = 0,
+                    y3 = 0,
+                    z3 = 0,
+                    y4 = 0,
+                    z4 = 0,
+                    t0 = 0,
+                    t1 = 0;
+                y0 = H[x + 320 >> 2] | 0;
+                y1 = H[x + 324 >> 2] | 0;
+                y2 = H[x + 328 >> 2] | 0;
+                y3 = H[x + 332 >> 2] | 0;
+                y4 = H[x + 336 >> 2] | 0;
+                for (i = 0; (i | 0) < (k | 0); i = i + 64 | 0) {
+                    z0 = y0;
+                    z1 = y1;
+                    z2 = y2;
+                    z3 = y3;
+                    z4 = y4;
+                    for (j = 0; (j | 0) < 64; j = j + 4 | 0) {
+                        t1 = H[i + j >> 2] | 0;
+                        t0 = ((y0 << 5 | y0 >>> 27) + (y1 & y2 | ~y1 & y3) | 0) + ((t1 + y4 | 0) + 1518500249 | 0) | 0;
+                        y4 = y3;
+                        y3 = y2;
+                        y2 = y1 << 30 | y1 >>> 2;
+                        y1 = y0;
+                        y0 = t0;
+                        H[k + j >> 2] = t1;
+                    }
+                    for (j = k + 64 | 0; (j | 0) < (k + 80 | 0); j = j + 4 | 0) {
+                        t1 = (H[j - 12 >> 2] ^ H[j - 32 >> 2] ^ H[j - 56 >> 2] ^ H[j - 64 >> 2]) << 1 | (H[j - 12 >> 2] ^ H[j - 32 >> 2] ^ H[j - 56 >> 2] ^ H[j - 64 >> 2]) >>> 31;
+                        t0 = ((y0 << 5 | y0 >>> 27) + (y1 & y2 | ~y1 & y3) | 0) + ((t1 + y4 | 0) + 1518500249 | 0) | 0;
+                        y4 = y3;
+                        y3 = y2;
+                        y2 = y1 << 30 | y1 >>> 2;
+                        y1 = y0;
+                        y0 = t0;
+                        H[j >> 2] = t1;
+                    }
+                    for (j = k + 80 | 0; (j | 0) < (k + 160 | 0); j = j + 4 | 0) {
+                        t1 = (H[j - 12 >> 2] ^ H[j - 32 >> 2] ^ H[j - 56 >> 2] ^ H[j - 64 >> 2]) << 1 | (H[j - 12 >> 2] ^ H[j - 32 >> 2] ^ H[j - 56 >> 2] ^ H[j - 64 >> 2]) >>> 31;
+                        t0 = ((y0 << 5 | y0 >>> 27) + (y1 ^ y2 ^ y3) | 0) + ((t1 + y4 | 0) + 1859775393 | 0) | 0;
+                        y4 = y3;
+                        y3 = y2;
+                        y2 = y1 << 30 | y1 >>> 2;
+                        y1 = y0;
+                        y0 = t0;
+                        H[j >> 2] = t1;
+                    }
+                    for (j = k + 160 | 0; (j | 0) < (k + 240 | 0); j = j + 4 | 0) {
+                        t1 = (H[j - 12 >> 2] ^ H[j - 32 >> 2] ^ H[j - 56 >> 2] ^ H[j - 64 >> 2]) << 1 | (H[j - 12 >> 2] ^ H[j - 32 >> 2] ^ H[j - 56 >> 2] ^ H[j - 64 >> 2]) >>> 31;
+                        t0 = ((y0 << 5 | y0 >>> 27) + (y1 & y2 | y1 & y3 | y2 & y3) | 0) + ((t1 + y4 | 0) - 1894007588 | 0) | 0;
+                        y4 = y3;
+                        y3 = y2;
+                        y2 = y1 << 30 | y1 >>> 2;
+                        y1 = y0;
+                        y0 = t0;
+                        H[j >> 2] = t1;
+                    }
+                    for (j = k + 240 | 0; (j | 0) < (k + 320 | 0); j = j + 4 | 0) {
+                        t1 = (H[j - 12 >> 2] ^ H[j - 32 >> 2] ^ H[j - 56 >> 2] ^ H[j - 64 >> 2]) << 1 | (H[j - 12 >> 2] ^ H[j - 32 >> 2] ^ H[j - 56 >> 2] ^ H[j - 64 >> 2]) >>> 31;
+                        t0 = ((y0 << 5 | y0 >>> 27) + (y1 ^ y2 ^ y3) | 0) + ((t1 + y4 | 0) - 899497514 | 0) | 0;
+                        y4 = y3;
+                        y3 = y2;
+                        y2 = y1 << 30 | y1 >>> 2;
+                        y1 = y0;
+                        y0 = t0;
+                        H[j >> 2] = t1;
+                    }
+                    y0 = y0 + z0 | 0;
+                    y1 = y1 + z1 | 0;
+                    y2 = y2 + z2 | 0;
+                    y3 = y3 + z3 | 0;
+                    y4 = y4 + z4 | 0;
+                }
+                H[x + 320 >> 2] = y0;
+                H[x + 324 >> 2] = y1;
+                H[x + 328 >> 2] = y2;
+                H[x + 332 >> 2] = y3;
+                H[x + 336 >> 2] = y4;
+            }
+            return { hash: hash };
+        };
+
+        return Rusha;
+    };
+</script>
+</head>
+<body>
+<input type="file"  id="file" onchange="init(this)" />
+<input type="text" id="result"/>
+</body>
+</html>
