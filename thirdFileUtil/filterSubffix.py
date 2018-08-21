@@ -135,6 +135,7 @@ def regReplaceATag(content):
 	    r"(?P<alink><a [^>]*href=[\'\"](?P<href>[^\'\"]+)[^>]* [^>]*tppabs=[\'\"](?P<tppabs>[^\'\"]+)[^>]*?>)", switchATag, content)
 	return newStr
 def swithchBack(matched):
+
 	style=matched.group("style")
 	src=matched.group("src")
 	if src.startswith("images/")==False:
@@ -144,7 +145,10 @@ def swithchBack(matched):
 #处理背景图片
 def regReplaceBackImg(content):
 	newStr = re.sub(
-	    r"(?P<style>style=[\'\"][^\'\"]*background-image: url\(\"(?P<src>[^\(\)\"\']+)\"\)[^\'\"]*?[\'\"])", swithchBack, content)
+	    r"(?P<style>style=[\'\"][^\'\"]*background-image:\s*url\(\"(?P<src>[^\(\)\"\']+)\"\)[^\'\"]*?[\'\"])", swithchBack, content)
+	newStr = re.sub(
+	    r"(?P<style>style=[\'\"][^\'\"]*background:\s*url\((?P<src>[^\(\)\"\']+)\)[^\'\"]*?[\'\"])", swithchBack, newStr)
+	# newStr=newStr.replace('data-src="','data-src="images/')
 	return newStr
 
 def operHtml(workfolder):
@@ -176,7 +180,7 @@ def dealWith(workfolder):
 	copyFont(workfolder)
 	operHtml(workfolder)
 if __name__ == '__main__':
-	workfolder="C:\\Users\\Administrator\\Desktop\\work\\template\\kidz"
+	workfolder="C:\\Users\\Administrator\\Desktop\\work\\template\\eye-clinic"
 	copyImg(workfolder)
 	copyJs(workfolder)
 	copyCss(workfolder)

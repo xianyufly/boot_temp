@@ -31,6 +31,6 @@ def initEnv():
 		env["chrome_driver_path"]="/usr/local/chromedriver"
 		env["python_sql"]="mysql+mysqldb://17sobt.com:17sobt.com@123456@localhost:6306/news"
 		env["html_aim_path"]="/data/www/html"
-		env["preview_domain"]="http://demo.17sobt.com/"
+		env["preview_domain"]="https://demo.17sobt.com/"
 		env["zip_work"]="/data/pythonwork/wrok"
 	return env
