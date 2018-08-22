@@ -17,7 +17,9 @@ def initEnv():
 		#预览地址
 		"preview_domain":"",
 		#zip工作目录
-		"zip_work":""
+		"zip_work":"",
+		#网站域名
+		"domain":""
 	}
 	if(sysstr =="Windows"):
 		#window平台
@@ -26,6 +28,7 @@ def initEnv():
 		env["html_aim_path"]="D:\\Apache2.4\\htdocs"
 		env["preview_domain"]="http://localhost/"
 		env["zip_work"]="C:\\Users\\Administrator\\Desktop\\work"
+		env["domain"]="http://localhost:3000/"
 	elif(sysstr == "Linux"):
 		#linux平台
 		env["chrome_driver_path"]="/usr/local/chromedriver"
@@ -33,4 +36,5 @@ def initEnv():
 		env["html_aim_path"]="/data/www/html"
 		env["preview_domain"]="https://demo.17sobt.com/"
 		env["zip_work"]="/data/pythonwork/wrok"
+		env["domain"]="https://www.17sobt.com/"
 	return env
