@@ -19,7 +19,9 @@ def initEnv():
 		#zip工作目录
 		"zip_work":"",
 		#网站域名
-		"domain":""
+		"domain":"",
+		#siteMap文件路径
+		"sitemap_path":""
 	}
 	if(sysstr =="Windows"):
 		#window平台
@@ -29,6 +31,7 @@ def initEnv():
 		env["preview_domain"]="http://localhost/"
 		env["zip_work"]="C:\\Users\\Administrator\\Desktop\\work"
 		env["domain"]="http://localhost:3000/"
+		env["sitemap_path"]="C:\\Users\\Administrator\\Desktop\\python_news\\pro_zx_nuxt\\site.txt"
 	elif(sysstr == "Linux"):
 		#linux平台
 		env["chrome_driver_path"]="/usr/local/chromedriver"
@@ -37,4 +40,5 @@ def initEnv():
 		env["preview_domain"]="https://demo.17sobt.com/"
 		env["zip_work"]="/data/pythonwork/wrok"
 		env["domain"]="https://www.17sobt.com/"
+		env["sitemap_path"]="/data/www/pro/site.txt"
 	return env

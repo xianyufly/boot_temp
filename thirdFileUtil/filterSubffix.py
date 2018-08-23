@@ -148,7 +148,7 @@ def regReplaceBackImg(content):
 	    r"(?P<style>style=[\'\"][^\'\"]*background-image:\s*url\(\"(?P<src>[^\(\)\"\']+)\"\)[^\'\"]*?[\'\"])", swithchBack, content)
 	newStr = re.sub(
 	    r"(?P<style>style=[\'\"][^\'\"]*background:\s*url\((?P<src>[^\(\)\"\']+)\)[^\'\"]*?[\'\"])", swithchBack, newStr)
-	# newStr=newStr.replace('data-src="','data-src="images/')
+	# newStr=newStr.replace('data-src="images/images/','data-src="images/')
 	return newStr
 
 def operHtml(workfolder):
@@ -180,7 +180,7 @@ def dealWith(workfolder):
 	copyFont(workfolder)
 	operHtml(workfolder)
 if __name__ == '__main__':
-	workfolder="C:\\Users\\Administrator\\Desktop\\work\\template\\eye-clinic"
+	workfolder="C:\\Users\\Administrator\\Desktop\\work\\template\\dist-flatify"
 	copyImg(workfolder)
 	copyJs(workfolder)
 	copyCss(workfolder)
