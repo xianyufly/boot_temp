@@ -27,7 +27,7 @@ for res in resList :
 	print("push地址:%s"%(pushUrl))
 	data+=pushUrl+"\n"
 	tid = res.tid
-file_object = open(_env["sitemap_path"],'w+', encoding='utf-8')
+file_object = open(_env["sitemap_path"],'a+', encoding='utf-8')
 try:
 	file_object.write(data)
 finally:
